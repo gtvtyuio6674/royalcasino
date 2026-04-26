@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Royal Casino</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --gold:#c9a84c;--gold2:#e8c96a;
+  --felt2:#174d2a;
+  --dark:#080c0a;
+  --red:#c0392b;--green:#27ae60;
+}
+body{background:var(--dark);color:#fff;min-height:100vh;font-family:'Georgia',serif;}
+.screen{display:none;} .screen.active{display:block;} .hidden{display:none!important;}
+
+/* LOBBY */
+#lobby{min-height:100vh;background:radial-gradient(ellipse at 50% 30%,#1a3a25 0%,#080c0a 65%);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;}
+.logo{font-size:48px;color:var(--gold);letter-spacing:6px;text-shadow:0 0 30px rgba(201,168,76,0.4);margin-bottom:4px;}
+.logo-sub{font-size:11px;color:#666;letter-spacing:8px;margin-bottom:50px;}
+.room-list{width:100%;max-width:480px;margin-bottom:32px;}
+.room-card{background:rgba(255,255,255,0.04);border:1px solid rgba(201,168,76,0.25);border-radius:14px;padding:18px 22px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;transition:all 0.2s;}
+.room-card:hover{background:rgba(201,168,76,0.08);border-color:var(--gold);}
+.room-name{font-size:16px;color:#fff;font-weight:bold;}
+.room-info{font-size:12px;color:#888;margin-top:3px;}
+.room-badge{background:var(--gold);color:#000;padding:5px 14px;border-radius:20px;font-size:12px;font-weight:bold;}
+.lobby-btns{display:flex;gap:12px;}
+.btn-primary{background:var(--gold);color:#000;border:none;padding:13px 30px;border-radius:10px;font-size:14px;font-weight:bold;cursor:pointer;transition:all 0.2s;}
+.btn-primary:hover{background:var(--gold2);}
+.btn-outline{background:transparent;color:var(--gold);border:1.5px solid var(--gold);padding:12px 28px;border-radius:10px;font-size:14px;cursor:pointer;transition:all 0.2s;}
+.btn-outline:hover{background:rgba(201,168,76,0.1);}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:200;backdrop-filter:blur(4px);}
+.modal{background:#141a14;border:1px solid rgba(201,168,76,0.35);border-radius:20px;padding:32px 28px;width:360px;text-align:center;}
+.modal h3{color:var(--gold);font-size:20px;margin-bottom:6px;}
+.modal p{font-size:13px;color:#777;margin-bottom:20px;}
+.modal input{width:100%;background:#1e261e;border:1px solid #333;color:#fff;padding:13px;border-radius:10px;font-size:15px;text-align:center;margin-bottom:12px;outline:none;transition:border 0.2s;}
+.modal input:focus{border-color:var(--gold);}
+.modal-btns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:4px;}
+.room-code-box{background:rgba(201,168,76,0.1);border:2px solid var(--gold);border-radius:12px;padding:14px;margin-bottom:16px;display:none;}
+.room-code-box.show{display:block;}
+.room-code-label{font-size:10px;color:#999;letter-spacing:3px;margin-bottom:6px;}
+.room-code-val{font-size:32px;color:var(--gold);font-weight:bold;letter-spacing:10px;}
+
+/* DEALER ROOM */
+#dealer-room{background:var(--dark);min-height:100vh;display:flex;flex-direction:column;}
+.dealer-header{background:#0d120d;border-bottom:1px solid rgba(201,168,76,0.2);padding:10px 18px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;flex-wrap:wrap;gap:8px;}
+.dh-left{display:flex;align-items:center;gap:10px;}
+.dealer-title{color:var(--gold);font-size:16px;font-weight:bold;letter-spacing:1px;}
+.code-pill{background:rgba(201,168,76,0.15);border:1px solid rgba(201,168,76,0.5);color:var(--gold);padding:3px 12px;border-radius:20px;font-size:13px;letter-spacing:4px;font-weight:bold;}
+.game-pill{background:var(--gold);color:#000;padding:3px 12px;border-radius:20px;font-size:11px;font-weight:bold;}
+.game-tabs{display:flex;gap:6px;flex-wrap:wrap;}
+.game-tab{background:rgba(255,255,255,0.04);border:1px solid #2a2a2a;color:#666;padding:7px 14px;border-radius:8px;cursor:pointer;font-size:13px;transition:all 0.15s;font-family:inherit;}
+.game-tab.active{background:var(--gold);color:#000;border-color:var(--gold);font-weight:bold;}
+.dealer-body{display:grid;grid-template-columns:1fr 280px;flex:1;overflow:hidden;}
+.seats-area{background:var(--felt2);padding:18px;overflow-y:auto;}
+.seats-summary{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
+.summary-chip{background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.08);border-radius:20px;padding:5px 14px;font-size:12px;color:#aaa;}
+.summary-chip span{color:#fff;font-weight:bold;margin-left:4px;}
+.seats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.seat-card{border-radius:12px;padding:14px;position:relative;transition:all 0.15s;}
+.seat-card.empty{background:rgba(0,0,0,0.2);border:1px dashed rgba(255,255,255,0.08);}
+.seat-card.occupied{background:rgba(0,0,0,0.35);border:1px solid rgba(201,168,76,0.3);cursor:pointer;}
+.seat-card.occupied:hover{border-color:var(--gold);}
+.seat-card.sel{border-color:var(--gold)!important;box-shadow:0 0 0 2px rgba(201,168,76,0.3);}
+.sc-num{font-size:10px;color:#555;letter-spacing:1px;margin-bottom:6px;}
+.sc-name{font-size:15px;color:#fff;font-weight:bold;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.sc-chips{font-size:22px;color:var(--gold);font-weight:bold;margin-bottom:8px;}
+.sc-bet{display:inline-block;background:rgba(231,76,60,0.2);border:1px solid rgba(231,76,60,0.4);color:#e74c3c;font-size:11px;padding:2px 8px;border-radius:10px;margin-bottom:8px;}
+.sc-chipbtns{display:flex;gap:3px;margin-bottom:8px;flex-wrap:wrap;}
+.chip-btn{border:none;border-radius:50%;width:30px;height:30px;font-size:9px;font-weight:bold;cursor:pointer;color:#fff;box-shadow:0 2px 0 rgba(0,0,0,0.3);}
+.result-btns{display:grid;grid-template-columns:1fr 1fr;gap:4px;}
+.result-btns.tie3{grid-template-columns:1fr 1fr 1fr;}
+.btn-win{background:linear-gradient(135deg,#27ae60,#1e8449);border:none;color:#fff;padding:8px 4px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:bold;}
+.btn-lose{background:linear-gradient(135deg,#c0392b,#922b21);border:none;color:#fff;padding:8px 4px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:bold;}
+.btn-tie{background:linear-gradient(135deg,#7f8c8d,#5d6d7e);border:none;color:#fff;padding:8px 4px;border-radius:8px;cursor:pointer;font-size:11px;font-weight:bold;}
+.seat-empty-label{color:#333;font-size:13px;padding:16px 0;text-align:center;}
+.dealer-panel{background:#0d120d;border-left:1px solid rgba(201,168,76,0.12);padding:16px;overflow-y:auto;display:flex;flex-direction:column;gap:14px;}
+.panel-block{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:14px;}
+.panel-title{font-size:10px;color:#555;letter-spacing:3px;text-transform:uppercase;margin-bottom:12px;}
+.bet-status-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--green);animation:pulse 1.5s infinite;}
+.dot.off{background:var(--red);animation:none;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+.bet-label{font-size:14px;font-weight:bold;}
+.bet-label.open{color:#55d68f;} .bet-label.closed{color:#ff6b6b;}
+.toggle-btn{width:100%;padding:11px;border:none;border-radius:10px;font-size:14px;font-weight:bold;cursor:pointer;font-family:inherit;}
+.toggle-btn.close-bet{background:linear-gradient(135deg,#c0392b,#922b21);color:#fff;}
+.toggle-btn.open-bet{background:linear-gradient(135deg,#27ae60,#1e8449);color:#fff;}
+.sel-empty{color:#444;font-size:12px;text-align:center;padding:8px 0;}
+.sel-info{display:none;}
+.sel-info.show{display:block;}
+.sel-name-lbl{color:var(--gold);font-size:13px;margin-bottom:4px;}
+.sel-chips-big{font-size:26px;color:#fff;font-weight:bold;}
+.sel-bet-row{font-size:12px;color:#888;margin-top:4px;}
+.chip-edit-row{display:flex;gap:6px;margin-top:8px;}
+.chip-edit-input{flex:1;background:#1a221a;border:1px solid #333;color:#fff;padding:8px;border-radius:8px;font-size:13px;outline:none;font-family:inherit;}
+.chip-edit-input:focus{border-color:var(--gold);}
+.chip-edit-btn{background:var(--gold);color:#000;border:none;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:bold;}
+.qchip-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;}
+.qchip-btn{background:rgba(255,255,255,0.04);border:1px solid #2a2a2a;color:#ccc;padding:8px;border-radius:8px;cursor:pointer;font-size:12px;text-align:center;font-family:inherit;}
+.qchip-btn:hover{background:rgba(201,168,76,0.15);border-color:rgba(201,168,76,0.4);color:var(--gold);}
+.rule-text{font-size:11px;color:#666;line-height:1.9;}
+
+/* USER ROOM */
+#user-room{min-height:100vh;background:radial-gradient(ellipse at 50% 0%,#1e5530 0%,#0f2e1a 50%,#080c0a 100%);display:flex;flex-direction:column;}
+.user-topbar{background:rgba(0,0,0,0.6);border-bottom:1px solid rgba(201,168,76,0.15);padding:10px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.utb-game-name{color:var(--gold);font-size:17px;font-weight:bold;}
+.utb-chips-val{font-size:18px;color:var(--gold);font-weight:bold;}
+.bet-closed-banner{background:rgba(192,57,43,0.95);color:#fff;text-align:center;padding:10px;font-size:14px;font-weight:bold;display:none;flex-shrink:0;}
+.bet-closed-banner.show{display:block;}
+.user-main{flex:1;overflow-y:auto;padding:20px;}
+.bet-zone{background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.08);border-radius:20px;padding:20px;margin-bottom:16px;text-align:center;}
+.bz-label{font-size:10px;color:#666;letter-spacing:3px;margin-bottom:6px;}
+.bz-amount{font-size:52px;color:var(--gold);font-weight:bold;line-height:1;margin-bottom:4px;text-shadow:0 0 20px rgba(201,168,76,0.3);}
+.bz-chips-left{font-size:12px;color:#555;margin-bottom:16px;}
+.chip-row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:12px;}
+.uchip{border:none;border-radius:50%;width:58px;height:58px;font-size:11px;font-weight:bold;cursor:pointer;color:#fff;box-shadow:0 4px 0 rgba(0,0,0,0.5),0 0 0 2px rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:center;}
+.uchip:active{transform:translateY(3px);}
+.uchip-1k{background:radial-gradient(circle at 35% 35%,#5dade2,#2471a3);}
+.uchip-5k{background:radial-gradient(circle at 35% 35%,#e74c3c,#a93226);}
+.uchip-10k{background:radial-gradient(circle at 35% 35%,#2ecc71,#1a8a4a);}
+.uchip-50k{background:radial-gradient(circle at 35% 35%,#9b59b6,#6c3483);}
+.uchip-100k{background:radial-gradient(circle at 35% 35%,#555,#222);border:2px solid #888;}
+.clear-btn{background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);color:#aaa;padding:8px 24px;border-radius:20px;cursor:pointer;font-size:13px;font-family:inherit;}
+.game-section{background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.06);border-radius:20px;padding:18px;margin-bottom:16px;}
+.gs-title{font-size:10px;color:#555;letter-spacing:3px;margin-bottom:14px;}
+.bac-grid{display:grid;grid-template-columns:1fr 0.7fr 1fr;gap:10px;}
+.bac-card{border-radius:14px;padding:18px 10px;text-align:center;cursor:pointer;border:2px solid transparent;transition:all 0.2s;}
+.bac-card.pl{background:rgba(41,128,185,0.2);border-color:rgba(41,128,185,0.5);}
+.bac-card.bk{background:rgba(192,57,43,0.2);border-color:rgba(192,57,43,0.5);}
+.bac-card.ti{background:rgba(39,174,96,0.2);border-color:rgba(39,174,96,0.5);}
+.bac-card.pl.chosen{background:rgba(41,128,185,0.5);border-color:#3498db;box-shadow:0 0 20px rgba(52,152,219,0.4);}
+.bac-card.bk.chosen{background:rgba(192,57,43,0.5);border-color:#e74c3c;box-shadow:0 0 20px rgba(231,76,60,0.4);}
+.bac-card.ti.chosen{background:rgba(39,174,96,0.5);border-color:#2ecc71;box-shadow:0 0 20px rgba(46,204,113,0.4);}
+.bac-emoji{font-size:22px;margin-bottom:6px;}
+.bac-name{font-size:14px;font-weight:bold;margin-bottom:4px;}
+.bac-name.pl{color:#74b9ff;} .bac-name.bk{color:#ff7675;} .bac-name.ti{color:#55efc4;}
+.bac-odds{font-size:11px;opacity:0.6;}
+.action-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.action-btn{padding:13px;border:1px solid rgba(255,255,255,0.1);border-radius:10px;cursor:default;background:rgba(255,255,255,0.04);color:#ccc;text-align:center;font-size:13px;}
+.bj-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.action-hint{font-size:11px;color:#444;text-align:center;margin-top:10px;}
+.user-nav{background:rgba(0,0,0,0.5);border-top:1px solid rgba(255,255,255,0.06);padding:10px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.nav-info{font-size:12px;color:#666;}
+.nav-lobby-btn{background:rgba(255,255,255,0.06);border:1px solid #2a2a2a;color:#888;padding:8px 20px;border-radius:20px;cursor:pointer;font-size:13px;font-family:inherit;}
+
+/* TOAST */
+.result-toast{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(0.85);background:#141a14;border:2px solid var(--gold);border-radius:20px;padding:36px 48px;text-align:center;z-index:300;display:none;opacity:0;transition:all 0.25s;}
+.result-toast.show{display:block;opacity:1;transform:translate(-50%,-50%) scale(1);}
+.r-emoji{font-size:52px;margin-bottom:10px;}
+.r-text{font-size:22px;font-weight:bold;margin-bottom:6px;}
+.r-sub{font-size:14px;color:#888;margin-bottom:20px;}
+.fb-dot{position:fixed;bottom:12px;right:12px;font-size:10px;padding:4px 10px;border-radius:20px;z-index:999;pointer-events:none;}
+.fb-dot.on{background:rgba(39,174,96,0.15);border:1px solid rgba(39,174,96,0.4);color:#55d68f;}
+.fb-dot.off{background:rgba(192,57,43,0.15);border:1px solid rgba(192,57,43,0.4);color:#ff6b6b;}
+input[type=number]{-moz-appearance:textfield;}
+input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appearance:none;}
+</style>
+</head>
+<body>
+
+<!-- LOBBY -->
+<div id="lobby" class="screen active">
+  <h1 class="logo">ROYAL CASINO</h1>
+  <p class="logo-sub">PRIVATE TABLE MANAGEMENT</p>
+  <div class="room-list" id="room-list"><p style="color:#444;font-size:13px;text-align:center;">불러오는 중...</p></div>
+  <div class="lobby-btns">
+    <button class="btn-primary" onclick="showCreateModal()">🎰 방 만들기 (딜러)</button>
+    <button class="btn-outline" onclick="showJoinModal()">🪑 방 참여 (손님)</button>
+  </div>
+</div>
+
+<!-- DEALER ROOM -->
+<div id="dealer-room" class="screen">
+  <div class="dealer-header">
+    <div class="dh-left">
+      <span class="dealer-title">DEALER</span>
+      <span class="code-pill" id="d-code">——</span>
+      <span class="game-pill" id="d-game-badge">홀덤</span>
+    </div>
+    <div class="game-tabs">
+      <button class="game-tab active" onclick="setGame('holdem',this)">홀덤</button>
+      <button class="game-tab" onclick="setGame('blackjack',this)">블랙잭</button>
+      <button class="game-tab" onclick="setGame('poker',this)">포커</button>
+      <button class="game-tab" onclick="setGame('baccarat',this)">바카라</button>
+    </div>
+    <button class="btn-outline" style="font-size:12px;padding:6px 14px;" onclick="goLobby()">로비</button>
+  </div>
+  <div class="dealer-body">
+    <div class="seats-area">
+      <div class="seats-summary">
+        <div class="summary-chip">참여자 <span id="s-count">0</span>명</div>
+        <div class="summary-chip">총 베팅 <span id="s-bets">0</span></div>
+        <div class="summary-chip">총 보유 <span id="s-chips">0</span></div>
+      </div>
+      <div class="seats-grid" id="seats-grid"></div>
+    </div>
+    <div class="dealer-panel">
+      <div class="panel-block">
+        <div class="panel-title">베팅 상태</div>
+        <div class="bet-status-row">
+          <div class="dot" id="bet-dot"></div>
+          <div class="bet-label open" id="bet-label-txt">베팅 진행 중</div>
+        </div>
+        <button class="toggle-btn close-bet" id="bet-toggle-btn" onclick="toggleBetting()">베팅 종료하기</button>
+      </div>
+      <div class="panel-block">
+        <div class="panel-title">선택된 자리</div>
+        <div class="sel-empty" id="sel-empty-msg">자리 카드를 클릭하세요</div>
+        <div class="sel-info" id="sel-info">
+          <div class="sel-name-lbl" id="sel-name"></div>
+          <div class="sel-chips-big" id="sel-chips"></div>
+          <div class="sel-bet-row">베팅: <span style="color:#e74c3c;font-weight:bold;" id="sel-bet">—</span></div>
+          <div class="chip-edit-row">
+            <input type="number" class="chip-edit-input" id="chip-direct" placeholder="칩 직접 설정">
+            <button class="chip-edit-btn" onclick="setChipsDirect()">설정</button>
+          </div>
+        </div>
+      </div>
+      <div class="panel-block">
+        <div class="panel-title">빠른 칩 지급</div>
+        <div class="qchip-grid">
+          <button class="qchip-btn" onclick="quickChips(5000)">+5천</button>
+          <button class="qchip-btn" onclick="quickChips(10000)">+1만</button>
+          <button class="qchip-btn" onclick="quickChips(30000)">+3만</button>
+          <button class="qchip-btn" onclick="quickChips(50000)">+5만</button>
+          <button class="qchip-btn" onclick="quickChips(100000)">+10만</button>
+          <button class="qchip-btn" onclick="quickChips(200000)">+20만</button>
+          <button class="qchip-btn" onclick="quickChips(500000)">+50만</button>
+          <button class="qchip-btn" onclick="quickChips(1000000)">+100만</button>
+        </div>
+      </div>
+      <div class="panel-block">
+        <div class="panel-title">게임 룰</div>
+        <div class="rule-text" id="rule-text"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- USER ROOM -->
+<div id="user-room" class="screen">
+  <div class="user-topbar">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span id="u-game-icon" style="font-size:18px;">♠️</span>
+      <span class="utb-game-name" id="u-game-name">홀덤</span>
+    </div>
+    <div style="text-align:right;">
+      <div style="font-size:10px;color:#666;letter-spacing:1px;">보유 칩</div>
+      <div class="utb-chips-val" id="u-chips">0</div>
+    </div>
+  </div>
+  <div class="bet-closed-banner" id="bet-banner">🔒 베팅이 마감되었습니다</div>
+  <div class="user-main">
+    <div class="bet-zone">
+      <div class="bz-label">현재 베팅</div>
+      <div class="bz-amount" id="u-bet-amount">0</div>
+      <div class="bz-chips-left">남은 칩 <span id="u-chips-left">0</span></div>
+      <div class="chip-row">
+        <button class="uchip uchip-1k" onclick="userBet(1000)">1K</button>
+        <button class="uchip uchip-5k" onclick="userBet(5000)">5K</button>
+        <button class="uchip uchip-10k" onclick="userBet(10000)">10K</button>
+        <button class="uchip uchip-50k" onclick="userBet(50000)">50K</button>
+        <button class="uchip uchip-100k" onclick="userBet(100000)">100K</button>
+      </div>
+      <button class="clear-btn" onclick="clearBet()">✕ 베팅 초기화</button>
+    </div>
+    <div class="game-section">
+      <div class="gs-title" id="u-section-title">게임 옵션</div>
+      <div id="u-game-ui"></div>
+    </div>
+  </div>
+  <div class="user-nav">
+    <div class="nav-info" id="u-nav-info">—</div>
+    <button class="nav-lobby-btn" onclick="goLobby()">← 로비</button>
+  </div>
+</div>
+
+<!-- MODALS -->
+<div class="modal-overlay hidden" id="create-modal">
+  <div class="modal">
+    <h3>방 만들기</h3>
+    <p>딜러 비밀번호를 입력하세요</p>
+    <input type="password" id="c-pw" placeholder="비밀번호" maxlength="10">
+    <input type="text" id="c-name" placeholder="방 이름 (예: VIP Room 1)">
+    <div class="room-code-box" id="c-code-box">
+      <div class="room-code-label">입장 코드 — 손님에게 공유하세요</div>
+      <div class="room-code-val" id="c-code-val">——</div>
+    </div>
+    <div class="modal-btns" id="c-btns">
+      <button class="btn-outline" onclick="hideModals()">취소</button>
+      <button class="btn-primary" onclick="doCreateRoom()">만들기</button>
+    </div>
+    <div id="c-enter-btn" style="display:none;margin-top:4px;">
+      <button class="btn-primary" style="width:100%;" onclick="enterDealer()">딜러룸 입장 →</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="join-modal">
+  <div class="modal">
+    <h3>방 참여</h3>
+    <p id="j-desc">방 코드와 닉네임을 입력하세요</p>
+    <input type="text" id="j-code" placeholder="방 코드 (6자리)" maxlength="6" oninput="this.value=this.value.toUpperCase()">
+    <input type="text" id="j-name" placeholder="닉네임">
+    <div id="j-dealer-block" style="display:none;">
+      <input type="password" id="j-dealer-pw" placeholder="딜러 비밀번호 (딜러 재입장 시)">
+    </div>
+    <div id="j-seats" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:12px;">
+      <p style="color:#555;font-size:12px;width:100%;text-align:center;">방 코드 입력 후 조회하세요</p>
+    </div>
+    <div class="modal-btns" id="j-btns">
+      <button class="btn-outline" onclick="hideModals()">취소</button>
+      <button class="btn-primary" onclick="doFindRoom()">자리 조회</button>
+    </div>
+  </div>
+</div>
+
+<div class="result-toast" id="result-toast">
+  <div class="r-emoji" id="r-emoji"></div>
+  <div class="r-text" id="r-text"></div>
+  <div class="r-sub" id="r-sub"></div>
+  <button class="btn-primary" onclick="hideToast()">확인</button>
+</div>
+
+<div class="fb-dot off" id="fb-dot">● 연결 중</div>
+
+<script>
+// ── Firebase ─────────────────────────────────────────────────────────
+const firebaseConfig = {
+  apiKey:"AIzaSyAgtcDnGHXl2QhspfbrcqBiehIGjzN3BU8",
+  authDomain:"royal-casino-17b95.firebaseapp.com",
+  databaseURL:"https://royal-casino-17b95-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:"royal-casino-17b95",
+  storageBucket:"royal-casino-17b95.firebasestorage.app",
+  messagingSenderId:"649492187779",
+  appId:"1:649492187779:web:47d25794ed2e8d241aa9b6"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+db.ref('.info/connected').on('value', s => {
+  const el = document.getElementById('fb-dot');
+  if (s.val()) { el.textContent='● 연결됨'; el.className='fb-dot on'; }
+  else { el.textContent='● 오프라인'; el.className='fb-dot off'; }
+});
+
+// ── 상수 ─────────────────────────────────────────────────────────────
+const DEALER_PW = '0420';
+const GAMES = {holdem:'홀덤',blackjack:'블랙잭',poker:'포커',baccarat:'바카라'};
+const ICONS = {holdem:'♠️',blackjack:'🃏',poker:'🎲',baccarat:'👑'};
+const RULES = {
+  holdem:'승리: 베팅 2배 지급\n폴드/콜/레이즈/올인\n최고 패 보유자 승리',
+  blackjack:'블랙잭(21): 베팅 1.5배\n일반 승리: 베팅 2배\n버스트: 패배',
+  poker:'스트플: 5배 / 포카드: 4배\nFH/플러시: 3배 / 일반승: 2배',
+  baccarat:'플레이어 승: 2배\n뱅커 승: 1.95배\n타이: 9배'
+};
+
+// ── 전역 상태 ─────────────────────────────────────────────────────────
+let R = {  // Room state
+  id: null,
+  isDealer: false,
+  game: 'holdem',
+  bettingOpen: true,
+  seats: {},
+  selectedSeat: null,
+  mySeat: null,
+  myBet: 0,
+  bacChoice: null
+};
+let roomOff = null;   // Firebase listener 해제 함수
+let lobbyOff = null;
+let discRef = null;   // onDisconnect ref
+
+function mkSeats() {
+  const s = {};
+  for (let i = 1; i <= 6; i++) s[i] = {name:'빈 자리', chips:0, bet:0, occupied:false};
+  return s;
+}
+
+// seat(n) → 숫자/문자 키 모두 대응
+function seat(n) { return R.seats[n] || R.seats[String(n)] || null; }
+
+// ── 화면 전환 ─────────────────────────────────────────────────────────
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+function hideModals() {
+  document.getElementById('create-modal').classList.add('hidden');
+  document.getElementById('join-modal').classList.add('hidden');
+}
+
+// ── 로비 ─────────────────────────────────────────────────────────────
+function initLobby() {
+  const el = document.getElementById('room-list');
+  el.innerHTML = '<p style="color:#444;font-size:13px;text-align:center;">불러오는 중...</p>';
+  if (lobbyOff) { lobbyOff(); lobbyOff = null; }
+
+  const ref = db.ref('rooms');
+  const handler = snap => {
+    const rooms = snap.val();
+    if (!rooms) { el.innerHTML='<p style="color:#444;font-size:13px;text-align:center;">활성화된 방이 없습니다</p>'; return; }
+    el.innerHTML = '';
+    Object.entries(rooms).forEach(([id, room]) => {
+      const occ = Object.values(room.seats||{}).filter(s=>s.occupied).length;
+      const div = document.createElement('div');
+      div.className = 'room-card';
+      div.onclick = () => showJoinModal(id);
+      div.innerHTML = `<div><div class="room-name">${room.name}</div><div class="room-info">${ICONS[room.currentGame]||'🃏'} ${GAMES[room.currentGame]||'홀덤'} · 👥 ${occ}/6명</div></div><div class="room-badge">참여</div>`;
+      el.appendChild(div);
+    });
+  };
+  ref.on('value', handler, err => {
+    el.innerHTML = `<p style="color:#e74c3c;font-size:13px;text-align:center;">⚠️ Firebase 연결 실패 (${err.code})<br><span style="font-size:11px;">DB 규칙에서 .read/.write 를 true로 설정하세요</span></p>`;
+  });
+  lobbyOff = () => ref.off('value', handler);
+}
+initLobby();
+
+// ── 방 만들기 ─────────────────────────────────────────────────────────
+function showCreateModal() {
+  document.getElementById('c-pw').value = '';
+  document.getElementById('c-name').value = '';
+  document.getElementById('c-code-box').classList.remove('show');
+  document.getElementById('c-btns').style.display = 'flex';
+  document.getElementById('c-enter-btn').style.display = 'none';
+  document.getElementById('create-modal').classList.remove('hidden');
+}
+
+function doCreateRoom() {
+  const pw = document.getElementById('c-pw').value;
+  if (pw !== DEALER_PW) { alert('비밀번호가 틀렸습니다.'); return; }
+  const name = document.getElementById('c-name').value.trim() || 'Royal Table';
+  const roomId = Math.random().toString(36).substr(2,6).toUpperCase();
+
+  db.ref('rooms/' + roomId).set({
+    name, currentGame:'holdem', bettingOpen:true, seats:mkSeats()
+  }, err => {
+    if (err) { alert('방 생성 실패: ' + err.message); return; }
+    R.id = roomId;
+    R.isDealer = true;
+    document.getElementById('c-code-val').textContent = roomId;
+    document.getElementById('c-code-box').classList.add('show');
+    document.getElementById('c-btns').style.display = 'none';
+    document.getElementById('c-enter-btn').style.display = 'block';
+  });
+}
+
+function enterDealer() {
+  hideModals();
+  show('dealer-room');
+  document.getElementById('d-code').textContent = R.id;
+  startListen(R.id);
+}
+
+// ── 방 참여 ─────────────────────────────────────────────────────────
+function showJoinModal(prefillCode) {
+  document.getElementById('j-code').value = prefillCode || '';
+  document.getElementById('j-name').value = '';
+  document.getElementById('j-dealer-pw').value = '';
+  document.getElementById('j-dealer-block').style.display = 'none';
+  document.getElementById('j-desc').textContent = '방 코드와 닉네임을 입력하세요';
+  document.getElementById('j-seats').innerHTML = '<p style="color:#555;font-size:12px;width:100%;text-align:center;">방 코드 입력 후 조회하세요</p>';
+  document.getElementById('j-btns').innerHTML = `
+    <button class="btn-outline" onclick="hideModals()">취소</button>
+    <button class="btn-primary" onclick="doFindRoom()">자리 조회</button>`;
+  document.getElementById('join-modal').classList.remove('hidden');
+  if (prefillCode) doFindRoom();
+}
+
+function doFindRoom() {
+  const code = document.getElementById('j-code').value.trim().toUpperCase();
+  if (!code) { alert('방 코드를 입력하세요.'); return; }
+
+  db.ref('rooms/' + code).once('value').then(snap => {
+    if (!snap.exists()) { alert('존재하지 않는 방 코드입니다.'); return; }
+    const seats = snap.val().seats || {};
+    buildSeatBtns(seats);
+    document.getElementById('j-dealer-block').style.display = 'block';
+    document.getElementById('j-desc').textContent = '자리 선택 후 입장 / 딜러는 재입장';
+    document.getElementById('j-btns').innerHTML = `
+      <button class="btn-outline" onclick="hideModals()">취소</button>
+      <button class="btn-primary" style="background:#8e44ad;" onclick="doRejoinDealer('${code}')">딜러 재입장</button>
+      <button class="btn-primary" onclick="doJoinRoom('${code}')">손님 입장</button>`;
+  }).catch(err => {
+    alert('조회 실패: ' + err.message);
+  });
+}
+
+function buildSeatBtns(seats) {
+  const c = document.getElementById('j-seats');
+  c.innerHTML = '';
+  for (let i = 1; i <= 6; i++) {
+    const s = seats[i] || seats[String(i)] || {occupied:false};
+    const btn = document.createElement('button');
+    btn.dataset.n = i;
+    btn.textContent = s.occupied ? `${i}번 (사용중)` : `${i}번 자리`;
+    btn.disabled = !!s.occupied;
+    btn.style.cssText = `padding:8px 14px;border-radius:8px;font-size:13px;font-family:inherit;
+      cursor:${s.occupied?'not-allowed':'pointer'};
+      background:${s.occupied?'rgba(255,255,255,0.03)':'rgba(201,168,76,0.15)'};
+      border:1px solid ${s.occupied?'#222':'rgba(201,168,76,0.4)'};
+      color:${s.occupied?'#333':'#c9a84c'};`;
+    if (!s.occupied) btn.onclick = () => {
+      document.querySelectorAll('#j-seats button').forEach(b => {
+        b.style.background = 'rgba(201,168,76,0.15)';
+        b.removeAttribute('data-sel');
+      });
+      btn.style.background = 'rgba(201,168,76,0.5)';
+      btn.setAttribute('data-sel', '1');
+    };
+    c.appendChild(btn);
+  }
+}
+
+function doJoinRoom(roomId) {
+  const name = document.getElementById('j-name').value.trim();
+  if (!name) { alert('닉네임을 입력하세요.'); return; }
+  const selBtn = document.querySelector('#j-seats button[data-sel]');
+  if (!selBtn) { alert('자리를 선택하세요.'); return; }
+  const seatNum = parseInt(selBtn.dataset.n);
+
+  // ── 핵심: 그냥 set() 으로 단순하게 처리 ──────────────────────────
+  // 재확인 없이 바로 씀 (동시 접속은 드문 케이스)
+  const seatRef = db.ref('rooms/' + roomId + '/seats/' + seatNum);
+
+  seatRef.once('value').then(snap => {
+    const cur = snap.val();
+    // cur이 null이면 defaultSeats로 방금 생성된 자리 → 그냥 진행
+    if (cur && cur.occupied === true) {
+      alert('이미 누군가 앉았습니다. 다른 자리를 선택하세요.');
+      doFindRoom();
+      return;
+    }
+
+    const chips = cur ? (cur.chips || 0) : 0;
+
+    seatRef.set({ name, chips, bet:0, occupied:true }).then(() => {
+      // onDisconnect: 탭 닫으면 자동으로 자리 해제
+      discRef = seatRef.onDisconnect();
+      discRef.update({ occupied:false, bet:0 });
+
+      // 상태 세팅
+      R.id = roomId;
+      R.isDealer = false;
+      R.mySeat = seatNum;
+      R.myBet = 0;
+
+      // 화면 전환
+      hideModals();
+      show('user-room');
+      startListen(roomId);
+    }).catch(err => {
+      alert('입장 실패: ' + err.message);
+    });
+  }).catch(err => {
+    alert('자리 확인 실패: ' + err.message);
+  });
+}
+
+function doRejoinDealer(roomId) {
+  const pw = document.getElementById('j-dealer-pw').value;
+  if (!pw) { alert('딜러 비밀번호를 입력하세요.'); return; }
+  if (pw !== DEALER_PW) { alert('비밀번호가 틀렸습니다.'); return; }
+  R.id = roomId;
+  R.isDealer = true;
+  hideModals();
+  show('dealer-room');
+  document.getElementById('d-code').textContent = roomId;
+  startListen(roomId);
+}
+
+// ── Firebase 리스너 ────────────────────────────────────────────────
+function startListen(roomId) {
+  if (roomOff) { roomOff(); roomOff = null; }
+  const ref = db.ref('rooms/' + roomId);
+  const handler = snap => {
+    if (!snap.exists()) {
+      // 방이 삭제됐을 때만 로비로
+      if (R.id) { alert('방이 삭제되었습니다.'); goLobby(); }
+      return;
+    }
+    const d = snap.val();
+    R.game = d.currentGame || 'holdem';
+    R.bettingOpen = d.bettingOpen !== false;
+    R.seats = d.seats || mkSeats();
+
+    if (R.isDealer) {
+      renderSeats();
+      updateBettingUI();
+      updateRuleText();
+      document.getElementById('d-game-badge').textContent = GAMES[R.game];
+      document.querySelectorAll('.game-tab').forEach(b =>
+        b.classList.toggle('active', b.textContent === GAMES[R.game])
+      );
+    } else {
+      renderUser();
+    }
+  };
+  ref.on('value', handler);
+  roomOff = () => ref.off('value', handler);
+}
+
+// ── 딜러 액션 ─────────────────────────────────────────────────────
+function setGame(game, btn) {
+  document.querySelectorAll('.game-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  db.ref('rooms/' + R.id).update({currentGame: game});
+}
+
+function toggleBetting() {
+  db.ref('rooms/' + R.id).update({bettingOpen: !R.bettingOpen});
+}
+
+function addChip(n, amt, e) {
+  if (e) e.stopPropagation();
+  const s = seat(n);
+  if (!s) return;
+  db.ref('rooms/' + R.id + '/seats/' + n).update({chips: (s.chips||0) + amt});
+}
+
+function quickChips(amt) {
+  if (!R.selectedSeat) { alert('자리를 먼저 선택하세요.'); return; }
+  const s = seat(R.selectedSeat);
+  if (!s || !s.occupied) { alert('점유된 자리를 선택하세요.'); return; }
+  db.ref('rooms/' + R.id + '/seats/' + R.selectedSeat).update({chips: (s.chips||0) + amt});
+}
+
+function setChipsDirect() {
+  if (!R.selectedSeat) { alert('자리를 먼저 선택하세요.'); return; }
+  const v = parseInt(document.getElementById('chip-direct').value);
+  if (isNaN(v) || v < 0) { alert('올바른 숫자를 입력하세요.'); return; }
+  db.ref('rooms/' + R.id + '/seats/' + R.selectedSeat).update({chips: v});
+  document.getElementById('chip-direct').value = '';
+}
+
+function resolveResult(n, result, e) {
+  if (e) e.stopPropagation();
+  const s = seat(n);
+  if (!s) return;
+  const bet = s.bet || 0;
+  let msg, emoji;
+  if (result === 'win') {
+    const pay = bet * 2;
+    db.ref('rooms/' + R.id + '/seats/' + n).update({chips: (s.chips||0) + pay, bet: 0});
+    msg = '+' + pay.toLocaleString() + ' 칩 지급'; emoji = '🏆';
+  } else if (result === 'lose') {
+    db.ref('rooms/' + R.id + '/seats/' + n).update({chips: Math.max(0, (s.chips||0) - bet), bet: 0});
+    msg = '-' + bet.toLocaleString() + ' 칩 차감'; emoji = '💸';
+  } else {
+    db.ref('rooms/' + R.id + '/seats/' + n).update({bet: 0});
+    msg = '베팅금 반환 (타이)'; emoji = '🤝';
+  }
+  showToast(result, n + '번 — ' + s.name, msg, emoji);
+}
+
+// ── 유저 액션 ─────────────────────────────────────────────────────
+function userBet(amt) {
+  if (!R.bettingOpen) { alert('베팅이 마감되었습니다.'); return; }
+  const s = seat(R.mySeat);
+  if (!s) return;
+  if (R.myBet + amt > s.chips) { alert('칩이 부족합니다.'); return; }
+  R.myBet += amt;
+  db.ref('rooms/' + R.id + '/seats/' + R.mySeat).update({bet: R.myBet});
+  document.getElementById('u-bet-amount').textContent = R.myBet.toLocaleString();
+  document.getElementById('u-chips-left').textContent = (s.chips - R.myBet).toLocaleString();
+}
+
+function clearBet() {
+  if (!R.bettingOpen) return;
+  R.myBet = 0;
+  if (R.mySeat) db.ref('rooms/' + R.id + '/seats/' + R.mySeat).update({bet: 0});
+  document.getElementById('u-bet-amount').textContent = '0';
+  const s = seat(R.mySeat);
+  if (s) document.getElementById('u-chips-left').textContent = (s.chips||0).toLocaleString();
+}
+
+function setBacChoice(c) {
+  R.bacChoice = c;
+  renderGameUI();
+}
+
+// ── 딜러 렌더링 ──────────────────────────────────────────────────
+function renderSeats() {
+  const grid = document.getElementById('seats-grid');
+  grid.innerHTML = '';
+  const occ = Object.values(R.seats).filter(s => s.occupied);
+  document.getElementById('s-count').textContent = occ.length;
+  document.getElementById('s-bets').textContent = occ.reduce((a,s)=>a+(s.bet||0),0).toLocaleString();
+  document.getElementById('s-chips').textContent = occ.reduce((a,s)=>a+(s.chips||0),0).toLocaleString();
+
+  for (let i = 1; i <= 6; i++) {
+    const s = seat(i) || {occupied:false, chips:0, bet:0, name:'빈 자리'};
+    const div = document.createElement('div');
+    if (!s.occupied) {
+      div.className = 'seat-card empty';
+      div.innerHTML = `<div class="sc-num">SEAT ${i}</div><div class="seat-empty-label">빈 자리</div>`;
+    } else {
+      div.className = 'seat-card occupied' + (R.selectedSeat===i?' sel':'');
+      div.onclick = () => selectSeat(i);
+      const hasTie = R.game==='baccarat'||R.game==='blackjack';
+      div.innerHTML = `
+        <div class="sc-num">SEAT ${i}</div>
+        <div class="sc-name">${s.name}</div>
+        <div class="sc-chips">${(s.chips||0).toLocaleString()}</div>
+        ${s.bet>0?`<div class="sc-bet">베팅 ${s.bet.toLocaleString()}</div>`:''}
+        <div class="sc-chipbtns">
+          <button class="chip-btn" style="background:#0984e3" onclick="addChip(${i},1000,event)">1K</button>
+          <button class="chip-btn" style="background:#d63031" onclick="addChip(${i},5000,event)">5K</button>
+          <button class="chip-btn" style="background:#00b894" onclick="addChip(${i},10000,event)">10K</button>
+          <button class="chip-btn" style="background:#6c5ce7" onclick="addChip(${i},50000,event)">50K</button>
+          <button class="chip-btn" style="background:#2d3436;border:1px solid #666" onclick="addChip(${i},100000,event)">100K</button>
+        </div>
+        <div class="result-btns${hasTie?' tie3':''}">
+          <button class="btn-win" onclick="resolveResult(${i},'win',event)">✓ WIN</button>
+          <button class="btn-lose" onclick="resolveResult(${i},'lose',event)">✗ LOSE</button>
+          ${hasTie?`<button class="btn-tie" onclick="resolveResult(${i},'tie',event)">=TIE</button>`:''}
+        </div>`;
+    }
+    grid.appendChild(div);
+  }
+  // 선택된 자리 패널 갱신
+  if (R.selectedSeat && seat(R.selectedSeat)?.occupied) selectSeat(R.selectedSeat);
+}
+
+function selectSeat(n) {
+  R.selectedSeat = n;
+  const s = seat(n);
+  document.getElementById('sel-empty-msg').style.display = 'none';
+  const info = document.getElementById('sel-info');
+  info.classList.add('show');
+  document.getElementById('sel-name').textContent = n + '번 — ' + s.name;
+  document.getElementById('sel-chips').textContent = (s.chips||0).toLocaleString() + ' 칩';
+  document.getElementById('sel-bet').textContent = s.bet ? s.bet.toLocaleString() + ' 베팅 중' : '없음';
+  // 카드 하이라이트
+  document.querySelectorAll('.seat-card').forEach(c => c.classList.remove('sel'));
+  const cards = document.querySelectorAll('.seat-card.occupied');
+  cards.forEach(c => {
+    if (c.querySelector('.sc-num')?.textContent === 'SEAT ' + n) c.classList.add('sel');
+  });
+}
+
+function updateBettingUI() {
+  const open = R.bettingOpen;
+  document.getElementById('bet-dot').className = 'dot' + (open?'':' off');
+  document.getElementById('bet-label-txt').textContent = open?'베팅 진행 중':'베팅 마감됨';
+  document.getElementById('bet-label-txt').className = 'bet-label ' + (open?'open':'closed');
+  document.getElementById('bet-toggle-btn').textContent = open?'베팅 종료하기':'베팅 재개하기';
+  document.getElementById('bet-toggle-btn').className = 'toggle-btn ' + (open?'close-bet':'open-bet');
+}
+
+function updateRuleText() {
+  document.getElementById('rule-text').innerHTML = (RULES[R.game]||'').replace(/\n/g,'<br>');
+}
+
+// ── 유저 렌더링 ──────────────────────────────────────────────────
+function renderUser() {
+  const s = seat(R.mySeat);
+  if (!s) return;
+  document.getElementById('u-game-name').textContent = GAMES[R.game];
+  document.getElementById('u-game-icon').textContent = ICONS[R.game]||'🃏';
+  document.getElementById('u-chips').textContent = (s.chips||0).toLocaleString();
+  R.myBet = s.bet || 0;
+  document.getElementById('u-bet-amount').textContent = R.myBet.toLocaleString();
+  document.getElementById('u-chips-left').textContent = Math.max(0,(s.chips||0)-R.myBet).toLocaleString();
+  document.getElementById('u-nav-info').textContent = R.mySeat + '번 자리 · ' + s.name;
+  document.getElementById('bet-banner').className = 'bet-closed-banner' + (R.bettingOpen?'':' show');
+  renderGameUI();
+}
+
+function renderGameUI() {
+  const c = document.getElementById('u-game-ui');
+  const t = document.getElementById('u-section-title');
+  if (R.game === 'baccarat') {
+    t.textContent = '어디에 베팅하시겠습니까?';
+    const p=R.bacChoice==='player', b=R.bacChoice==='banker', ti=R.bacChoice==='tie';
+    c.innerHTML = `<div class="bac-grid">
+      <div class="bac-card pl${p?' chosen':''}" onclick="setBacChoice('player')"><div class="bac-emoji">🔵</div><div class="bac-name pl">플레이어</div><div class="bac-odds">1:1</div></div>
+      <div class="bac-card ti${ti?' chosen':''}" onclick="setBacChoice('tie')"><div class="bac-emoji">🟢</div><div class="bac-name ti">타이</div><div class="bac-odds">8:1</div></div>
+      <div class="bac-card bk${b?' chosen':''}" onclick="setBacChoice('banker')"><div class="bac-emoji">🔴</div><div class="bac-name bk">뱅커</div><div class="bac-odds">0.95:1</div></div>
+    </div>`;
+  } else if (R.game === 'holdem') {
+    t.textContent = '현재 액션';
+    c.innerHTML = `<div class="action-grid"><div class="action-btn">📤 폴드</div><div class="action-btn">📞 콜</div><div class="action-btn">📈 레이즈</div><div class="action-btn">💥 올인</div></div><div class="action-hint">딜러에게 액션을 말씀해주세요</div>`;
+  } else if (R.game === 'blackjack') {
+    t.textContent = '블랙잭 액션';
+    c.innerHTML = `<div class="bj-grid"><div class="action-btn">➕ 히트</div><div class="action-btn">✋ 스탠드</div><div class="action-btn">✂️ 스플릿</div><div class="action-btn" style="grid-column:1/-1">×2 더블다운 (베팅 ${R.myBet.toLocaleString()})</div></div><div class="action-hint">딜러에게 액션을 말씀해주세요</div>`;
+  } else if (R.game === 'poker') {
+    t.textContent = '포커 액션';
+    c.innerHTML = `<div class="bj-grid"><div class="action-btn">📤 폴드</div><div class="action-btn">📞 콜</div><div class="action-btn">📈 레이즈</div><div class="action-btn">✅ 체크</div><div class="action-btn">💥 올인</div><div class="action-btn">🃏 쇼다운</div></div><div class="action-hint">딜러에게 액션을 말씀해주세요</div>`;
+  }
+}
+
+// ── 토스트 ────────────────────────────────────────────────────────
+function showToast(result, name, msg, emoji) {
+  const colors = {win:'#55d68f', lose:'#ff6b6b', tie:'#ffd32a'};
+  document.getElementById('r-emoji').textContent = emoji;
+  document.getElementById('r-text').textContent = name;
+  document.getElementById('r-text').style.color = colors[result]||'#fff';
+  document.getElementById('r-sub').textContent = msg;
+  const t = document.getElementById('result-toast');
+  t.style.display = 'block';
+  setTimeout(() => t.classList.add('show'), 10);
+}
+function hideToast() {
+  const t = document.getElementById('result-toast');
+  t.classList.remove('show');
+  setTimeout(() => t.style.display='none', 250);
+}
+
+// ── 로비로 나가기 ─────────────────────────────────────────────────
+function goLobby() {
+  const savedId = R.id;
+  const savedSeat = R.mySeat;
+  const wasDealer = R.isDealer;
+
+  // 유저면 자리 해제
+  if (!wasDealer && savedSeat && savedId) {
+    if (discRef) { discRef.cancel(); discRef = null; }
+    const s = seat(savedSeat);
+    const chips = s ? (s.chips||0) : 0;
+    db.ref('rooms/' + savedId + '/seats/' + savedSeat)
+      .update({occupied:false, bet:0})
+      .then(() => {
+        // 아무도 없으면 방 삭제
+        db.ref('rooms/' + savedId + '/seats').once('value').then(snap => {
+          const seats = snap.val();
+          if (!seats || !Object.values(seats).some(s=>s.occupied)) {
+            db.ref('rooms/' + savedId).remove();
+          }
+        });
+      });
+  }
+
+  if (roomOff) { roomOff(); roomOff = null; }
+  R = {id:null, isDealer:false, game:'holdem', bettingOpen:true, seats:{}, selectedSeat:null, mySeat:null, myBet:0, bacChoice:null};
+
+  show('lobby');
+  initLobby();
+}
+</script>
+</body>
+</html>

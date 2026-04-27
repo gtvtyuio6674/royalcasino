@@ -356,6 +356,36 @@ input::placeholder{color:rgba(255,255,255,0.18);}
 .bj-waiting-banner.show{display:block;}
 .bj-waiting-msg{font-size:11px;color:var(--text-dim);letter-spacing:1px;}
 
+/* ── USER: BJ Order panel ── */
+.u-bj-order{background:rgba(0,0,0,0.35);border:1px solid rgba(201,168,76,0.15);border-radius:16px;padding:14px 16px;margin-bottom:12px;display:none;}
+.u-bj-order.show{display:block;animation:fadeIn 0.3s ease;}
+.u-bj-order-label{font-size:8px;letter-spacing:5px;color:rgba(201,168,76,0.4);font-family:'Cinzel',serif;margin-bottom:10px;}
+.u-bj-queue{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+.u-bj-q-item{display:flex;flex-direction:column;align-items:center;gap:3px;}
+.u-bj-q-dot{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;font-family:'Cinzel',serif;border:2px solid transparent;transition:all 0.3s;}
+.u-bj-q-dot.waiting{background:rgba(255,255,255,0.03);border-color:rgba(255,255,255,0.08);color:rgba(255,255,255,0.25);}
+.u-bj-q-dot.current{background:linear-gradient(135deg,var(--gold-light),var(--gold));color:#000;border-color:var(--gold);transform:scale(1.18);box-shadow:0 0 14px rgba(201,168,76,0.4);}
+.u-bj-q-dot.done{background:rgba(39,174,96,0.12);border-color:rgba(39,174,96,0.35);color:#55efc4;}
+.u-bj-q-name{font-size:8px;color:var(--text-dim);max-width:36px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;}
+.u-bj-arrow{color:rgba(255,255,255,0.1);font-size:10px;margin-bottom:14px;}
+
+/* ── USER: Baccarat stats panel ── */
+.u-bac-stats{background:rgba(0,0,0,0.35);border:1px solid rgba(201,168,76,0.15);border-radius:16px;overflow:hidden;margin-bottom:12px;display:none;}
+.u-bac-stats.show{display:block;animation:fadeIn 0.3s ease;}
+.u-bac-stats-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.04);}
+.u-bac-stats-label{font-size:8px;letter-spacing:5px;color:rgba(201,168,76,0.4);font-family:'Cinzel',serif;}
+.u-bac-counts{display:flex;gap:12px;}
+.u-bac-cnt{font-size:12px;font-weight:700;font-family:'Cinzel',serif;}
+.u-bac-cnt.p{color:#74b9ff;}
+.u-bac-cnt.b{color:#ff7675;}
+.u-bac-cnt.t{color:#55efc4;}
+.u-bac-road{display:flex;flex-wrap:wrap;gap:5px;padding:12px 14px;min-height:44px;}
+.u-brd-dot{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;}
+.u-brd-p{background:rgba(41,128,185,0.2);border:2px solid #3498db;color:#74b9ff;}
+.u-brd-b{background:rgba(192,57,43,0.2);border:2px solid #e74c3c;color:#ff7675;}
+.u-brd-t{background:rgba(39,174,96,0.2);border:2px solid #2ecc71;color:#55efc4;}
+.u-bac-empty{font-size:11px;color:var(--text-dim);padding:4px 0;letter-spacing:1px;}
+
 /* User bottom nav */
 .user-nav{background:rgba(0,0,0,0.7);border-top:1px solid rgba(255,255,255,0.04);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;backdrop-filter:blur(20px);}
 .nav-seat-info{font-size:12px;color:var(--text-dim);}
@@ -593,6 +623,25 @@ input::placeholder{color:rgba(255,255,255,0.18);}
     </div>
     <div class="bj-waiting-banner" id="bj-waiting-banner">
       <div class="bj-waiting-msg" id="bj-waiting-msg">다른 플레이어의 차례입니다…</div>
+    </div>
+
+    <!-- BJ 진행 순서 (게스트용) -->
+    <div class="u-bj-order" id="u-bj-order">
+      <div class="u-bj-order-label">블랙잭 진행 순서</div>
+      <div class="u-bj-queue" id="u-bj-queue"></div>
+    </div>
+
+    <!-- 바카라 통계 (게스트용) -->
+    <div class="u-bac-stats" id="u-bac-stats">
+      <div class="u-bac-stats-head">
+        <div class="u-bac-stats-label">바카라 통계</div>
+        <div class="u-bac-counts">
+          <span class="u-bac-cnt p" id="u-bac-p">P:0</span>
+          <span class="u-bac-cnt b" id="u-bac-b">B:0</span>
+          <span class="u-bac-cnt t" id="u-bac-t">T:0</span>
+        </div>
+      </div>
+      <div class="u-bac-road" id="u-bac-road"></div>
     </div>
 
     <div class="game-ui-section">
@@ -935,6 +984,8 @@ function startListen(roomId){
     R.bettingOpen=d.bettingOpen!==false;
     R.seats=d.seats||mkSeats();
     R.bjTurnSeat=d.bjTurnSeat||null;
+    // 바카라 로그 Firebase에서 동기화
+    R.bacLog=d.bacLog||[];
     if(R.isDealer){
       renderSeats();updateBettingUI();updateRuleText();updateDealerGameExtras();
       document.getElementById('d-game-badge').textContent=GAMES[R.game];
@@ -963,12 +1014,15 @@ function updateDealerGameExtras(){
 /* ══ BACCARAT LOG ══ */
 // Stored locally for dealer session (could extend to Firebase if needed)
 function addBacLog(result){
-  R.bacLog.push(result); // 'p','b','t'
+  R.bacLog.push(result);
   renderBacLog();
+  // Firebase에도 저장해서 게스트도 볼 수 있게
+  db.ref('rooms/'+R.id+'/bacLog').set(R.bacLog);
 }
 function clearBacLog(){
   R.bacLog=[];
   renderBacLog();
+  db.ref('rooms/'+R.id+'/bacLog').remove();
 }
 function renderBacLog(){
   const road=document.getElementById('bac-log-road');
@@ -1461,8 +1515,77 @@ function renderUser(){
     bjWaitBanner.classList.remove('show');
   }
   renderPlayerRow();
+  renderUserBJOrder();
+  renderUserBacStats();
   renderGameUI();
 }
+/* ── 게스트용 BJ 순서 패널 ── */
+function renderUserBJOrder(){
+  const panel=document.getElementById('u-bj-order');
+  const queue=document.getElementById('u-bj-queue');
+  if(!panel||!queue) return;
+  const isBJ=R.game==='blackjack';
+  panel.className='u-bj-order'+(isBJ?' show':'');
+  if(!isBJ) return;
+  queue.innerHTML='';
+  const seats=[];
+  for(let i=1;i<=6;i++){const s=seat(i);if(s&&s.occupied)seats.push(i);}
+  seats.forEach((n,idx)=>{
+    const s=seat(n);
+    const isCur=R.bjTurnSeat===n;
+    const done=s&&s.bjDone;
+    if(idx>0){
+      const arrow=document.createElement('div');
+      arrow.className='u-bj-arrow';
+      arrow.textContent='▶';
+      queue.appendChild(arrow);
+    }
+    const item=document.createElement('div');
+    item.className='u-bj-q-item';
+    const dot=document.createElement('div');
+    dot.className='u-bj-q-dot '+(isCur?'current':done?'done':'waiting');
+    dot.textContent=n;
+    const nm=document.createElement('div');
+    nm.className='u-bj-q-name';
+    nm.textContent=s?s.name:'';
+    item.appendChild(dot);
+    item.appendChild(nm);
+    queue.appendChild(item);
+  });
+  if(!seats.length){
+    queue.innerHTML='<div style="font-size:11px;color:var(--text-dim);">참여자 없음</div>';
+  }
+}
+
+/* ── 게스트용 바카라 통계 패널 ── */
+function renderUserBacStats(){
+  const panel=document.getElementById('u-bac-stats');
+  const road=document.getElementById('u-bac-road');
+  const cp=document.getElementById('u-bac-p');
+  const cb=document.getElementById('u-bac-b');
+  const ct=document.getElementById('u-bac-t');
+  if(!panel||!road) return;
+  const isBac=R.game==='baccarat';
+  panel.className='u-bac-stats'+(isBac?' show':'');
+  if(!isBac) return;
+  const log=R.bacLog||[];
+  const pc=log.filter(x=>x==='p').length;
+  const bc=log.filter(x=>x==='b').length;
+  const tc=log.filter(x=>x==='t').length;
+  cp.textContent='P:'+pc; cb.textContent='B:'+bc; ct.textContent='T:'+tc;
+  road.innerHTML='';
+  if(!log.length){
+    road.innerHTML='<div class="u-bac-empty">아직 기록 없음</div>';
+    return;
+  }
+  log.forEach(r=>{
+    const dot=document.createElement('div');
+    dot.className='u-brd-dot '+({'p':'u-brd-p','b':'u-brd-b','t':'u-brd-t'}[r]||'u-brd-p');
+    dot.textContent={'p':'P','b':'B','t':'T'}[r]||'?';
+    road.appendChild(dot);
+  });
+}
+
 function renderPlayerRow(){
   const row=document.getElementById('player-row');
   row.innerHTML='';
